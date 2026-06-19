@@ -1,18 +1,19 @@
 # siliconflow-codegen
 
-`siliconflow-codegen` is a tiny Go command-line tool that talks to the SiliconFlow model API and can generate provider configurations for OpenCode or Crush.
+`siliconflow-codegen` is a tiny Go command-line tool that talks to the SiliconFlow model API and can generate provider configurations for OpenCode, Crush, or Qwencode.
 
-By default, it prints the raw SiliconFlow model API response. With `--gen-opencode` or `--gen-crush`, it converts the discovered model IDs into a ready-to-use provider config.
+By default, it prints the raw SiliconFlow model API response. With `--gen-opencode`, `--gen-crush`, or `--gen-qwencode`, it converts the discovered model IDs into a ready-to-use provider config.
 
 The generated provider is intentionally SiliconFlow-specific:
 
-- provider key: `siliconflow`
+- provider key: `siliconflow` for OpenCode and Crush
 - provider type: `openai`
 - base URL: `https://api.siliconflow.com/v1`
-- API key placeholder: `${SILICONFLOW_API_KEY}` for OpenCode or `$SILICONFLOW_API_KEY` for Crush
+- API key placeholder: `${SILICONFLOW_API_KEY}` for OpenCode, `$SILICONFLOW_API_KEY` for Crush, or `SILICONFLOW_API_KEY` for Qwencode
 - models: every model ID returned by the SiliconFlow API
 - OpenCode model input modalities: `text`, `image`, `video`, `audio`
 - OpenCode model output modalities: `text`
+- Qwencode model generation config: `modalities.image = true`
 
 ## Requirements
 
@@ -55,6 +56,12 @@ The generated Crush config will contain:
 "api_key": "$SILICONFLOW_API_KEY"
 ```
 
+The generated Qwencode config will contain:
+
+```json
+"envKey": "SILICONFLOW_API_KEY"
+```
+
 The tool never writes your real API key into the generated config file.
 
 ## Fetch the raw model list
@@ -90,7 +97,33 @@ Accept: application/json
 Authorization: Bearer ${SILICONFLOW_API_KEY}
 ```
 
-## Generate the OpenCode config
+## Generate the Qwencode config
+
+To generate the Qwencode-compatible SiliconFlow provider config:
+
+```bash
+go run . --gen-qwencode
+```
+
+Or through Make:
+
+```bash
+make gen-qwencode
+```
+
+By default, this writes:
+
+```text
+siliconflow.qwencode.json
+```
+
+To choose another output path:
+
+```bash
+make gen-qwencode QWENCODE_CONFIG=qwencode-providers/siliconflow.json
+```
+
+## Generated OpenCode config shape
 
 To generate the OpenCode-compatible SiliconFlow provider config:
 
@@ -233,6 +266,30 @@ The generated file has this structure:
 
 Every model returned by the SiliconFlow API becomes an entry under `providers.siliconflow.models`, keyed by its model ID in the `id` field.
 
+## Generated Qwencode config shape
+
+The generated file has this structure:
+
+```json
+{
+  "openai": [
+    {
+      "id": "ByteDance-Seed/Seed-OSS-36B-Instruct",
+      "name": "ByteDance-Seed/Seed-OSS-36B-Instruct",
+      "envKey": "SILICONFLOW_API_KEY",
+      "baseUrl": "https://api.siliconflow.com/v1",
+      "generationConfig": {
+        "modalities": {
+          "image": true
+        }
+      }
+    }
+  ]
+}
+```
+
+Every model returned by the SiliconFlow API becomes an entry in the top-level `openai` array, sorted by model ID.
+
 ## Build locally
 
 Build a native binary for your current machine:
@@ -253,6 +310,7 @@ Run it directly:
 ./dist/siliconflow-codegen
 ./dist/siliconflow-codegen --gen-opencode
 ./dist/siliconflow-codegen --gen-crush
+./dist/siliconflow-codegen --gen-qwencode
 ```
 
 ## Cross-platform builds
@@ -323,6 +381,7 @@ siliconflow.opencode.json
 | `make dist` | Build Linux ARM64, Linux AMD64 and macOS ARM64 binaries. |
 | `make gen-opencode` | Generate `siliconflow.opencode.json` using `go run . --gen-opencode`. |
 | `make gen-crush` | Generate `siliconflow.crush.json` using `go run . --gen-crush`. |
+| `make gen-qwencode` | Generate `siliconflow.qwencode.json` using `go run . --gen-qwencode`. |
 | `make gen-opencode-linux-arm64` | Build the Linux ARM64 binary, then generate the OpenCode config. |
 | `make gen-opencode-linux-amd64` | Build the Linux AMD64 binary, then generate the OpenCode config. |
 | `make gen-opencode-darwin-arm64` | Build the macOS ARM64 binary, then generate the OpenCode config. |
@@ -386,6 +445,32 @@ Expected output:
 $SILICONFLOW_API_KEY
 ```
 
+## Inspect the generated Qwencode config
+
+After generation, inspect the model count with `jq`:
+
+```bash
+jq '.openai | length' siliconflow.qwencode.json
+```
+
+Inspect one model:
+
+```bash
+jq '.openai[] | select(.id == "ByteDance-Seed/Seed-OSS-36B-Instruct")' siliconflow.qwencode.json
+```
+
+Validate that the API key is a placeholder, not a real secret:
+
+```bash
+jq -r '.openai[0].envKey' siliconflow.qwencode.json
+```
+
+Expected output:
+
+```text
+SILICONFLOW_API_KEY
+```
+
 ## Troubleshooting
 
 ### `ERROR: SILICONFLOW_API_KEY is not set`
@@ -401,6 +486,7 @@ Then retry:
 ```bash
 make gen-opencode
 make gen-crush
+make gen-qwencode
 ```
 
 ### API returns a non-200 status

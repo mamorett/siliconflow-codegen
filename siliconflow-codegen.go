@@ -25,6 +25,8 @@ const (
 	crushProviderKey = "siliconflow"
 	crushType        = "openai"
 	crushAPIKey      = "$SILICONFLOW_API_KEY"
+
+	qwencodeAPIKey = "SILICONFLOW_API_KEY"
 )
 
 var (
@@ -86,13 +88,40 @@ type crushModel struct {
 	SupportsAttachments bool    `json:"supports_attachments,omitempty"`
 }
 
+type qwencodeConfig struct {
+	OpenAI []qwencodeModel `json:"openai"`
+}
+
+type qwencodeModel struct {
+	ID               string                   `json:"id"`
+	Name             string                   `json:"name"`
+	EnvKey           string                   `json:"envKey"`
+	BaseURL          string                   `json:"baseUrl"`
+	GenerationConfig qwencodeGenerationConfig `json:"generationConfig,omitempty"`
+}
+
+type qwencodeGenerationConfig struct {
+	Modalities map[string]bool `json:"modalities"`
+}
+
 func main() {
 	genOpenCode := flag.Bool("gen-opencode", false, "generate an OpenCode-compatible SiliconFlow provider config instead of printing the raw API response")
 	genCrush := flag.Bool("gen-crush", false, "generate a Crush-compatible SiliconFlow provider config instead of printing the raw API response")
+	genQwencode := flag.Bool("gen-qwencode", false, "generate a Qwencode-compatible SiliconFlow provider config instead of printing the raw API response")
 	flag.Parse()
 
-	if *genOpenCode && *genCrush {
-		fmt.Fprintln(os.Stderr, "ERROR: --gen-opencode and --gen-crush cannot be used together")
+	requestedGenerators := 0
+	if *genOpenCode {
+		requestedGenerators++
+	}
+	if *genCrush {
+		requestedGenerators++
+	}
+	if *genQwencode {
+		requestedGenerators++
+	}
+	if requestedGenerators > 1 {
+		fmt.Fprintln(os.Stderr, "ERROR: only one of --gen-opencode, --gen-crush, or --gen-qwencode can be used at a time")
 		os.Exit(1)
 	}
 
@@ -122,6 +151,17 @@ func main() {
 		}
 	case *genCrush:
 		config, err := generateCrushConfig(body)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		if _, err := os.Stdout.Write(config); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: writing output: %v\n", err)
+			os.Exit(1)
+		}
+	case *genQwencode:
+		config, err := generateQwencodeConfig(body)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -250,6 +290,43 @@ func generateCrushConfig(body []byte) ([]byte, error) {
 	encoded, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("ERROR: encoding Crush config: %w", err)
+	}
+
+	return append(encoded, '\n'), nil
+}
+
+func generateQwencodeConfig(body []byte) ([]byte, error) {
+	ids, err := parseModelIDs(body)
+	if err != nil {
+		return nil, err
+	}
+
+	models := make([]qwencodeModel, 0, len(ids))
+	for _, id := range ids {
+		models = append(models, qwencodeModel{
+			ID:      id,
+			Name:    id,
+			EnvKey:  qwencodeAPIKey,
+			BaseURL: baseURL,
+			GenerationConfig: qwencodeGenerationConfig{
+				Modalities: map[string]bool{
+					"image": true,
+				},
+			},
+		})
+	}
+
+	if len(models) == 0 {
+		return nil, errors.New("ERROR: no models found in API response")
+	}
+
+	config := qwencodeConfig{
+		OpenAI: models,
+	}
+
+	encoded, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("ERROR: encoding Qwencode config: %w", err)
 	}
 
 	return append(encoded, '\n'), nil

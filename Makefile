@@ -2,6 +2,7 @@ BINARY_NAME := siliconflow-codegen
 DIST_DIR := dist
 OPENCODE_CONFIG ?= siliconflow.opencode.json
 CRUSH_CONFIG ?= siliconflow.crush.json
+QWENCODE_CONFIG ?= siliconflow.qwencode.json
 LDFLAGS ?= -s -w
 
 LOCAL_BINARY := $(DIST_DIR)/$(BINARY_NAME)
@@ -11,7 +12,7 @@ BINARIES := \
 	$(DIST_DIR)/$(BINARY_NAME)-linux-amd64 \
 	$(DIST_DIR)/$(BINARY_NAME)-darwin-arm64
 
-.PHONY: all build dist clean gen-opencode gen-crush gen-opencode-linux-arm64 gen-opencode-linux-amd64 gen-opencode-darwin-arm64 models raw-models test format help
+.PHONY: all build dist clean gen-opencode gen-crush gen-qwencode gen-opencode-linux-arm64 gen-opencode-linux-amd64 gen-opencode-darwin-arm64 models raw-models test format help
 
 all: build
 
@@ -41,6 +42,10 @@ gen-crush:
 	@test -n "$${SILICONFLOW_API_KEY}" || { echo "ERROR: SILICONFLOW_API_KEY is required" >&2; exit 1; }
 	go run . --gen-crush > $(CRUSH_CONFIG)
 
+gen-qwencode:
+	@test -n "$${SILICONFLOW_API_KEY}" || { echo "ERROR: SILICONFLOW_API_KEY is required" >&2; exit 1; }
+	go run . --gen-qwencode > $(QWENCODE_CONFIG)
+
 gen-opencode-linux-arm64: $(DIST_DIR)/$(BINARY_NAME)-linux-arm64
 	@test -n "$${SILICONFLOW_API_KEY}" || { echo "ERROR: SILICONFLOW_API_KEY is required" >&2; exit 1; }
 	./$(DIST_DIR)/$(BINARY_NAME)-linux-arm64 --gen-opencode > $(OPENCODE_CONFIG)
@@ -66,7 +71,7 @@ format:
 	gofmt -w siliconflow-codegen.go
 
 clean:
-	rm -rf $(DIST_DIR) siliconflow.opencode.json siliconflow.crush.json siliconflow.models.json
+	rm -rf $(DIST_DIR) siliconflow.opencode.json siliconflow.crush.json siliconflow.qwencode.json siliconflow.models.json
 
 help:
 	@echo "siliconflow-codegen"
@@ -76,6 +81,7 @@ help:
 	@echo "  dist                          Build linux-arm64, linux-amd64 and darwin-arm64 binaries"
 	@echo "  gen-opencode                  Generate $(OPENCODE_CONFIG) with the local Go toolchain"
 	@echo "  gen-crush                     Generate $(CRUSH_CONFIG) with the local Go toolchain"
+	@echo "  gen-qwencode                  Generate $(QWENCODE_CONFIG) with the local Go toolchain"
 	@echo "  gen-opencode-linux-arm64      Build linux-arm64 binary and generate $(OPENCODE_CONFIG)"
 	@echo "  gen-opencode-linux-amd64      Build linux-amd64 binary and generate $(OPENCODE_CONFIG)"
 	@echo "  gen-opencode-darwin-arm64     Build darwin-arm64 binary and generate $(OPENCODE_CONFIG)"

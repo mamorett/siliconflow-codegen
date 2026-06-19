@@ -88,6 +88,44 @@ func TestGenerateCrushConfig(t *testing.T) {
 	}
 }
 
+func TestGenerateQwencodeConfig(t *testing.T) {
+	body := []byte(`{"data":[{"id":"b-model"},{"id":"a-model"},{"id":"  "}]}`)
+
+	encoded, err := generateQwencodeConfig(body)
+	if err != nil {
+		t.Fatalf("generateQwencodeConfig returned error: %v", err)
+	}
+
+	var config qwencodeConfig
+	if err := json.Unmarshal(encoded, &config); err != nil {
+		t.Fatalf("generated config is not valid JSON: %v", err)
+	}
+
+	if len(config.OpenAI) != 2 {
+		t.Fatalf("model count = %d, want 2", len(config.OpenAI))
+	}
+
+	wantIDs := []string{"a-model", "b-model"}
+	for i, id := range wantIDs {
+		model := config.OpenAI[i]
+		if model.ID != id {
+			t.Fatalf("model %d id = %q, want %q", i, model.ID, id)
+		}
+		if model.Name != id {
+			t.Fatalf("model %d name = %q, want %q", i, model.Name, id)
+		}
+		if model.EnvKey != qwencodeAPIKey {
+			t.Fatalf("model %d envKey = %q, want %q", i, model.EnvKey, qwencodeAPIKey)
+		}
+		if model.BaseURL != baseURL {
+			t.Fatalf("model %d baseUrl = %q, want %q", i, model.BaseURL, baseURL)
+		}
+		if !model.GenerationConfig.Modalities["image"] {
+			t.Fatalf("model %d image modality = false, want true", i)
+		}
+	}
+}
+
 func TestGenerateOpenCodeConfigRejectsEmptyModelList(t *testing.T) {
 	if _, err := generateOpenCodeConfig([]byte(`{"data":[]}`)); err == nil {
 		t.Fatal("generateOpenCodeConfig returned nil error for empty model list")
@@ -97,6 +135,12 @@ func TestGenerateOpenCodeConfigRejectsEmptyModelList(t *testing.T) {
 func TestGenerateCrushConfigRejectsEmptyModelList(t *testing.T) {
 	if _, err := generateCrushConfig([]byte(`{"data":[]}`)); err == nil {
 		t.Fatal("generateCrushConfig returned nil error for empty model list")
+	}
+}
+
+func TestGenerateQwencodeConfigRejectsEmptyModelList(t *testing.T) {
+	if _, err := generateQwencodeConfig([]byte(`{"data":[]}`)); err == nil {
+		t.Fatal("generateQwencodeConfig returned nil error for empty model list")
 	}
 }
 
