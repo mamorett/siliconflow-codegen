@@ -123,7 +123,7 @@ To choose another output path:
 make gen-qwencode QWENCODE_CONFIG=qwencode-providers/siliconflow.json
 ```
 
-## Generated OpenCode config shape
+## Generate the OpenCode config
 
 To generate the OpenCode-compatible SiliconFlow provider config:
 
@@ -174,6 +174,37 @@ To choose another output path:
 ```bash
 make gen-crush CRUSH_CONFIG=crush-providers/siliconflow.json
 ```
+
+## Set the model and Launch Claude Code CLI
+
+You can use the `--claude` flag to interactively select a model from SiliconFlow and immediately launch the `claude` (Claude Code) CLI with `ANTHROPIC_MODEL` set to your selection.
+
+Using `make`:
+
+```bash
+make claude
+```
+
+Or using direct `go run`:
+
+```bash
+go run . --claude
+```
+
+Or if you are using the compiled binary:
+
+```bash
+./dist/siliconflow-codegen --claude
+```
+
+### How it works
+
+1. It fetches the latest model list from SiliconFlow.
+2. It displays a clean, column-aligned grid of available models on `stderr`.
+3. It prompts you to enter a number to make a selection.
+4. It sets the `ANTHROPIC_MODEL` environment variable in the process's environment.
+5. It searches for the `claude` binary in your system `PATH` and immediately launches it as a subprocess.
+6. The launched `claude` session inherits the environment variable and uses the selected SiliconFlow model.
 
 ## Generated OpenCode config shape
 
@@ -382,6 +413,7 @@ siliconflow.opencode.json
 | `make gen-opencode` | Generate `siliconflow.opencode.json` using `go run . --gen-opencode`. |
 | `make gen-crush` | Generate `siliconflow.crush.json` using `go run . --gen-crush`. |
 | `make gen-qwencode` | Generate `siliconflow.qwencode.json` using `go run . --gen-qwencode`. |
+| `make claude` | Interactively select a SiliconFlow model and launch the Claude CLI. |
 | `make gen-opencode-linux-arm64` | Build the Linux ARM64 binary, then generate the OpenCode config. |
 | `make gen-opencode-linux-amd64` | Build the Linux AMD64 binary, then generate the OpenCode config. |
 | `make gen-opencode-darwin-arm64` | Build the macOS ARM64 binary, then generate the OpenCode config. |

@@ -1,3 +1,4 @@
+MAKEFLAGS += --no-print-directory
 BINARY_NAME := siliconflow-codegen
 DIST_DIR := dist
 OPENCODE_CONFIG ?= siliconflow.opencode.json
@@ -12,7 +13,7 @@ BINARIES := \
 	$(DIST_DIR)/$(BINARY_NAME)-linux-amd64 \
 	$(DIST_DIR)/$(BINARY_NAME)-darwin-arm64
 
-.PHONY: all build dist clean gen-opencode gen-crush gen-qwencode gen-opencode-linux-arm64 gen-opencode-linux-amd64 gen-opencode-darwin-arm64 models raw-models test format help
+.PHONY: all build dist clean gen-opencode gen-crush gen-qwencode claude gen-opencode-linux-arm64 gen-opencode-linux-amd64 gen-opencode-darwin-arm64 models raw-models test format help
 
 all: build
 
@@ -45,6 +46,10 @@ gen-crush:
 gen-qwencode:
 	@test -n "$${SILICONFLOW_API_KEY}" || { echo "ERROR: SILICONFLOW_API_KEY is required" >&2; exit 1; }
 	go run . --gen-qwencode > $(QWENCODE_CONFIG)
+
+claude:
+	@test -n "$${SILICONFLOW_API_KEY}" || { echo "ERROR: SILICONFLOW_API_KEY is required" >&2; exit 1; }
+	@go run . --claude
 
 gen-opencode-linux-arm64: $(DIST_DIR)/$(BINARY_NAME)-linux-arm64
 	@test -n "$${SILICONFLOW_API_KEY}" || { echo "ERROR: SILICONFLOW_API_KEY is required" >&2; exit 1; }
@@ -82,6 +87,7 @@ help:
 	@echo "  gen-opencode                  Generate $(OPENCODE_CONFIG) with the local Go toolchain"
 	@echo "  gen-crush                     Generate $(CRUSH_CONFIG) with the local Go toolchain"
 	@echo "  gen-qwencode                  Generate $(QWENCODE_CONFIG) with the local Go toolchain"
+	@echo "  claude                        Interactively select a SiliconFlow model and launch Claude CLI"
 	@echo "  gen-opencode-linux-arm64      Build linux-arm64 binary and generate $(OPENCODE_CONFIG)"
 	@echo "  gen-opencode-linux-amd64      Build linux-amd64 binary and generate $(OPENCODE_CONFIG)"
 	@echo "  gen-opencode-darwin-arm64     Build darwin-arm64 binary and generate $(OPENCODE_CONFIG)"

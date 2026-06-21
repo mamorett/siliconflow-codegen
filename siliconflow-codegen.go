@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -8,7 +9,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -108,20 +111,24 @@ func main() {
 	genOpenCode := flag.Bool("gen-opencode", false, "generate an OpenCode-compatible SiliconFlow provider config instead of printing the raw API response")
 	genCrush := flag.Bool("gen-crush", false, "generate a Crush-compatible SiliconFlow provider config instead of printing the raw API response")
 	genQwencode := flag.Bool("gen-qwencode", false, "generate a Qwencode-compatible SiliconFlow provider config instead of printing the raw API response")
+	genClaude := flag.Bool("claude", false, "list SiliconFlow models and print an export command for ANTHROPIC_MODEL=<selected>")
 	flag.Parse()
 
-	requestedGenerators := 0
+	requestedActions := 0
 	if *genOpenCode {
-		requestedGenerators++
+		requestedActions++
 	}
 	if *genCrush {
-		requestedGenerators++
+		requestedActions++
 	}
 	if *genQwencode {
-		requestedGenerators++
+		requestedActions++
 	}
-	if requestedGenerators > 1 {
-		fmt.Fprintln(os.Stderr, "ERROR: only one of --gen-opencode, --gen-crush, or --gen-qwencode can be used at a time")
+	if *genClaude {
+		requestedActions++
+	}
+	if requestedActions > 1 {
+		fmt.Fprintln(os.Stderr, "ERROR: only one of --gen-opencode, --gen-crush, --gen-qwencode, or --claude can be used at a time")
 		os.Exit(1)
 	}
 
@@ -169,6 +176,51 @@ func main() {
 
 		if _, err := os.Stdout.Write(config); err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR: writing output: %v\n", err)
+			os.Exit(1)
+		}
+	case *genClaude:
+		ids, err := parseModelIDs(body)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		var input io.Reader = os.Stdin
+		var output io.Writer = os.Stderr
+		if tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0); err == nil {
+			defer tty.Close()
+			input = tty
+			output = tty
+		}
+
+		selected, err := promptForModel(ids, input, output)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		os.Setenv("ANTHROPIC_MODEL", selected)
+
+		claudePath, err := exec.LookPath("claude")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: 'claude' CLI not found in PATH. Please install it or ensure it is in your PATH.\n")
+			fmt.Fprintf(os.Stderr, "To set it manually in your shell, run: export ANTHROPIC_MODEL=%q\n", selected)
+			os.Exit(1)
+		}
+
+		fmt.Fprintf(os.Stderr, "Launching Claude Code with ANTHROPIC_MODEL=%s...\n", selected)
+
+		cmd := exec.Command(claudePath)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			var exitErr *exec.ExitError
+			if errors.As(err, &exitErr) {
+				os.Exit(exitErr.ExitCode())
+			}
+			fmt.Fprintf(os.Stderr, "ERROR: running 'claude': %v\n", err)
 			os.Exit(1)
 		}
 	default:
@@ -357,6 +409,43 @@ func parseModelIDs(body []byte) ([]string, error) {
 	return ids, nil
 }
 
+func promptForModel(models []string, input io.Reader, output io.Writer) (string, error) {
+	if len(models) == 0 {
+		return "", errors.New("ERROR: no SiliconFlow models found in API response")
+	}
+
+	cols := chooseColumnCount(len(models), longestID(models), terminalWidth())
+	if err := writeModelGrid(output, models, cols); err != nil {
+		return "", err
+	}
+
+	reader := bufio.NewReader(input)
+	prompt := fmt.Sprintf("\nmodel [1-%d, blank to quit]> ", len(models))
+	for {
+		if _, err := fmt.Fprint(output, prompt); err != nil {
+			return "", fmt.Errorf("ERROR: writing prompt: %w", err)
+		}
+
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("ERROR: reading selection: %w", err)
+		}
+
+		choice := strings.TrimSpace(line)
+		if choice == "" {
+			return "", errors.New("ERROR: model selection cancelled")
+		}
+
+		index, err := strconv.Atoi(choice)
+		if err != nil || index < 1 || index > len(models) {
+			fmt.Fprintf(output, "ERROR: enter a number between 1 and %d\n", len(models))
+			continue
+		}
+
+		return models[index-1], nil
+	}
+}
+
 func printRawResponse(body []byte) {
 	if len(body) == 0 {
 		return
@@ -366,4 +455,90 @@ func printRawResponse(body []byte) {
 	if body[len(body)-1] != '\n' {
 		os.Stdout.WriteString("\n")
 	}
+}
+
+func longestID(models []string) int {
+	max := 0
+	for _, model := range models {
+		if len(model) > max {
+			max = len(model)
+		}
+	}
+	return max
+}
+
+func terminalWidth() int {
+	if value := os.Getenv("COLUMNS"); value != "" {
+		if width, err := strconv.Atoi(value); err == nil && width > 0 {
+			return width
+		}
+	}
+	return 100
+}
+
+// chooseColumnCount picks a column count that lays the models out in roughly
+// square rows within the terminal width, leaving a small margin per column.
+func chooseColumnCount(count, idWidth, width int) int {
+	if width <= 0 {
+		width = 100
+	}
+	margin := 4 // room for the "NNN) " prefix and trailing space
+	cell := idWidth + margin
+	if cell < 8 {
+		cell = 8
+	}
+	maxCols := width / cell
+	if maxCols < 1 {
+		maxCols = 1
+	}
+	if maxCols > count {
+		maxCols = count
+	}
+
+	bestCols := 1
+	bestMaxDim := count
+	for c := 1; c <= maxCols; c++ {
+		rows := (count + c - 1) / c
+		maxDim := rows
+		if c > rows {
+			maxDim = c
+		}
+		// Prefer the column count that minimises the larger of rows/cols
+		// (i.e. a roughly square grid), breaking ties by the smaller
+		// column count so the model IDs are easier to scan.
+		if maxDim < bestMaxDim {
+			bestMaxDim = maxDim
+			bestCols = c
+		}
+	}
+	return bestCols
+}
+
+func writeModelGrid(output io.Writer, models []string, cols int) error {
+	if _, err := fmt.Fprintln(output, "Available SiliconFlow models (enter the number to set ANTHROPIC_MODEL):"); err != nil {
+		return fmt.Errorf("ERROR: writing header: %w", err)
+	}
+
+	if cols < 1 {
+		cols = 1
+	}
+	rows := (len(models) + cols - 1) / cols
+	idWidth := longestID(models)
+
+	for row := 0; row < rows; row++ {
+		for col := 0; col < cols; col++ {
+			idx := col*rows + row
+			if idx >= len(models) {
+				continue
+			}
+			if _, err := fmt.Fprintf(output, "%3d) %-*s  ", idx+1, idWidth, models[idx]); err != nil {
+				return fmt.Errorf("ERROR: writing model list: %w", err)
+			}
+		}
+		if _, err := fmt.Fprintln(output); err != nil {
+			return fmt.Errorf("ERROR: writing model list: %w", err)
+		}
+	}
+
+	return nil
 }

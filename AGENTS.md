@@ -7,6 +7,8 @@ This repository is a small Go command-line tool, `siliconflow-codegen`, that fet
 - the raw SiliconFlow API response
 - an OpenCode-compatible provider config
 - a Crush-compatible provider config
+- a Qwencode-compatible provider config
+- an interactive shell environment configuration for Claude Code (`--claude`)
 
 It is intentionally narrow: one package, one source file, one test file, and a Makefile that wraps build/test/generation commands.
 
@@ -107,7 +109,7 @@ The program is a single `package main` binary. Keep changes local and simple unl
 
 Important functions:
 
-- `main()` — parses flags, rejects simultaneous `--gen-opencode` and `--gen-crush`, checks the API key, fetches models, and dispatches output mode.
+- `main()` — parses flags, rejects simultaneous use of multiple generator/action flags, checks the API key, fetches models, and dispatches the requested output mode.
 - `fetchModels(apiKey string)` — performs the HTTP GET and validates status/body.
 - `generateOpenCodeConfig(body []byte)` — parses IDs, builds the OpenCode JSON shape, and writes JSON to stdout.
 - `generateCrushConfig(body []byte)` — parses IDs, builds the Crush JSON shape, and writes JSON to stdout.
@@ -151,9 +153,9 @@ When adding tests, prefer small focused tests around generator behavior and pars
 
 ## Gotchas
 
-- `--gen-opencode` and `--gen-crush` are mutually exclusive; running both exits with an error.
-- `make gen-opencode*` and `make gen-crush` overwrite their target files through shell redirection.
-- `make clean` removes `dist/` plus generated `siliconflow.opencode.json`, `siliconflow.crush.json`, and `siliconflow.models.json`.
+- `--gen-opencode`, `--gen-crush`, `--gen-qwencode`, and `--claude` are mutually exclusive; running more than one exits with an error.
+- `make gen-opencode`, `make gen-crush`, and `make gen-qwencode` overwrite their target files through shell redirection.
+- `make clean` removes `dist/` plus generated `siliconflow.opencode.json`, `siliconflow.crush.json`, `siliconflow.qwencode.json`, and `siliconflow.models.json`.
 - `dist/` is ignored by Git.
 - There is no lint target in the Makefile. Use `gofmt` and `go test ./...` as the baseline checks.
 - The source file currently has an unused `opencodeProviderKey` constant. Do not rely on it for behavior; remove it only if making a cleanup change.

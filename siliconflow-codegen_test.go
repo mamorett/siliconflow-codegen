@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -158,5 +160,90 @@ func TestParseModelIDsDeduplicatesAndSorts(t *testing.T) {
 		if ids[i] != id {
 			t.Fatalf("ids[%d] = %q, want %q", i, ids[i], id)
 		}
+	}
+}
+func TestPromptForModelReturnsSelectedID(t *testing.T) {
+	models := []string{"a-model", "b-model", "c-model"}
+	input := bytes.NewBufferString("2\n")
+	var output bytes.Buffer
+
+	selected, err := promptForModel(models, input, &output)
+	if err != nil {
+		t.Fatalf("promptForModel returned error: %v", err)
+	}
+
+	if selected != "b-model" {
+		t.Fatalf("selected = %q, want %q", selected, "b-model")
+	}
+	if !strings.Contains(output.String(), "1) a-model") {
+		t.Fatalf("output does not list models:\n%s", output.String())
+	}
+}
+
+func TestPromptForModelRejectsInvalidChoice(t *testing.T) {
+	models := []string{"a-model", "b-model"}
+	input := bytes.NewBufferString("bogus\n0\n5\n2\n")
+	var output bytes.Buffer
+
+	selected, err := promptForModel(models, input, &output)
+	if err != nil {
+		t.Fatalf("promptForModel returned error: %v", err)
+	}
+
+	if selected != "b-model" {
+		t.Fatalf("selected = %q, want %q", selected, "b-model")
+	}
+}
+
+func TestPromptForModelBlankCancels(t *testing.T) {
+	models := []string{"a-model", "b-model"}
+	input := bytes.NewBufferString("\n")
+	var output bytes.Buffer
+
+	if _, err := promptForModel(models, input, &output); err == nil {
+		t.Fatal("promptForModel returned nil error for blank input")
+	}
+}
+
+func TestWriteModelGridPutsIndicesInOrder(t *testing.T) {
+	models := []string{"alpha", "bravo", "charlie", "delta", "echo", "foxtrot"}
+	var output bytes.Buffer
+	if err := writeModelGrid(&output, models, 3); err != nil {
+		t.Fatalf("writeModelGrid returned error: %v", err)
+	}
+
+	for _, want := range []string{"1) alpha", "2) bravo", "3) charlie", "4) delta", "5) echo", "6) foxtrot"} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("grid output missing %q:\n%s", want, output.String())
+		}
+	}
+}
+
+func TestChooseColumnCountPrefersSquareLayout(t *testing.T) {
+	cases := []struct {
+		name   string
+		count  int
+		idLen  int
+		width  int
+		expect int
+	}{
+		{name: "six models in 80 cols", count: 6, idLen: 20, width: 80, expect: 2},
+		{name: "twelve models in 80 cols", count: 12, idLen: 12, width: 80, expect: 3},
+		{name: "narrow terminal forces single column", count: 5, idLen: 60, width: 40, expect: 1},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := chooseColumnCount(c.count, c.idLen, c.width)
+			if got != c.expect {
+				t.Fatalf("chooseColumnCount(%d, %d, %d) = %d, want %d", c.count, c.idLen, c.width, got, c.expect)
+			}
+		})
+	}
+}
+
+func TestPromptForModelRejectsEmptyList(t *testing.T) {
+	if _, err := promptForModel(nil, &bytes.Buffer{}, &bytes.Buffer{}); err == nil {
+		t.Fatal("promptForModel returned nil error for empty model list")
 	}
 }
