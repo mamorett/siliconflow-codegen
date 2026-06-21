@@ -200,17 +200,22 @@ func main() {
 		}
 
 		os.Setenv("ANTHROPIC_MODEL", selected)
+		os.Setenv("ANTHROPIC_API_KEY", os.Getenv("SILICONFLOW_API_KEY"))
+		os.Setenv("ANTHROPIC_BASE_URL", "https://api.siliconflow.com/")
 
-		claudePath, err := exec.LookPath("claude")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: 'claude' CLI not found in PATH. Please install it or ensure it is in your PATH.\n")
-			fmt.Fprintf(os.Stderr, "To set it manually in your shell, run: export ANTHROPIC_MODEL=%q\n", selected)
-			os.Exit(1)
+		shell := os.Getenv("SHELL")
+		if shell == "" {
+			if os.PathSeparator == '/' {
+				shell = "/bin/zsh"
+			} else {
+				shell = "cmd.exe"
+			}
 		}
 
-		fmt.Fprintf(os.Stderr, "Launching Claude Code with ANTHROPIC_MODEL=%s...\n", selected)
+		fmt.Fprintf(os.Stderr, "Spawning a new shell session with ANTHROPIC_MODEL=%s...\n", selected)
+		fmt.Fprintf(os.Stderr, "(Type 'exit' or press Ctrl+D to return to your parent shell)\n")
 
-		cmd := exec.Command(claudePath)
+		cmd := exec.Command(shell)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -220,7 +225,7 @@ func main() {
 			if errors.As(err, &exitErr) {
 				os.Exit(exitErr.ExitCode())
 			}
-			fmt.Fprintf(os.Stderr, "ERROR: running 'claude': %v\n", err)
+			fmt.Fprintf(os.Stderr, "ERROR: running shell: %v\n", err)
 			os.Exit(1)
 		}
 	default:
