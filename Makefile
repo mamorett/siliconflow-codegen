@@ -87,7 +87,7 @@ help:
 	@echo "  gen-opencode                  Generate $(OPENCODE_CONFIG) with the local Go toolchain"
 	@echo "  gen-crush                     Generate $(CRUSH_CONFIG) with the local Go toolchain"
 	@echo "  gen-qwencode                  Generate $(QWENCODE_CONFIG) with the local Go toolchain"
-	@echo "  claude                        Interactively select a SiliconFlow model and spawn a shell with environment variables"
+	@echo "  claude                        Interactively select a SiliconFlow model and output its ID"
 	@echo "  gen-opencode-linux-arm64      Build linux-arm64 binary and generate $(OPENCODE_CONFIG)"
 	@echo "  gen-opencode-linux-amd64      Build linux-amd64 binary and generate $(OPENCODE_CONFIG)"
 	@echo "  gen-opencode-darwin-arm64     Build darwin-arm64 binary and generate $(OPENCODE_CONFIG)"

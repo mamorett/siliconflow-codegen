@@ -175,28 +175,22 @@ To choose another output path:
 make gen-crush CRUSH_CONFIG=crush-providers/siliconflow.json
 ```
 
-## Set the model and Spawn Shell for Claude Code CLI
+## Set the model for Claude Code CLI
 
-You can use the `--claude` flag to interactively select a model from SiliconFlow and spawn a new shell session (Zsh, Bash, etc.) containing the environment variables (`ANTHROPIC_MODEL`, `ANTHROPIC_API_KEY`, and `ANTHROPIC_BASE_URL`) pre-configured.
+You can use the `--claude` flag to interactively select a model from SiliconFlow and assign it directly to `ANTHROPIC_MODEL` in your terminal shell.
 
-This allows you to run `claude` (Claude Code) directly, exit it, resume sessions, and run other shell commands on the fly without changing your persistent shell configurations.
+Because standard output is used only to print the selected model ID, you can use command substitution to set the environment variable:
+
+```bash
+export ANTHROPIC_MODEL=$(./dist/siliconflow-codegen --claude)
+claude
+```
 
 Using `make`:
 
 ```bash
-make claude
-```
-
-Or using direct `go run`:
-
-```bash
-go run . --claude
-```
-
-Or if you are using the compiled binary:
-
-```bash
-./dist/siliconflow-codegen --claude
+export ANTHROPIC_MODEL=$(make -s claude)
+claude
 ```
 
 ### How it works
@@ -204,10 +198,8 @@ Or if you are using the compiled binary:
 1. It fetches the latest model list from SiliconFlow.
 2. It displays a clean, column-aligned grid of available models on `stderr`.
 3. It prompts you to enter a number to make a selection.
-4. It exports `ANTHROPIC_MODEL`, `ANTHROPIC_API_KEY` (using your local `SILICONFLOW_API_KEY`), and `ANTHROPIC_BASE_URL` in the environment.
-5. It spawns a new interactive shell session (inheriting the shell configuration from your `$SHELL` environment variable) containing these variables.
-6. Inside this new session, you can run `claude` directly as many times as you like. All sessions will target your selected SiliconFlow model.
-7. Type `exit` (or press `Ctrl+D`) to exit the subshell and return to your parent terminal shell.
+4. It prints **only** the selected model ID to `stdout` (e.g., `deepseek-ai/DeepSeek-V3`).
+5. The shell captures the printed ID and exports it to `ANTHROPIC_MODEL`.
 
 ## Generated OpenCode config shape
 
@@ -416,7 +408,7 @@ siliconflow.opencode.json
 | `make gen-opencode` | Generate `siliconflow.opencode.json` using `go run . --gen-opencode`. |
 | `make gen-crush` | Generate `siliconflow.crush.json` using `go run . --gen-crush`. |
 | `make gen-qwencode` | Generate `siliconflow.qwencode.json` using `go run . --gen-qwencode`. |
-| `make claude` | Interactively select a SiliconFlow model and spawn a shell with environment variables. |
+| `make claude` | Interactively select a SiliconFlow model and output its ID to stdout. |
 | `make gen-opencode-linux-arm64` | Build the Linux ARM64 binary, then generate the OpenCode config. |
 | `make gen-opencode-linux-amd64` | Build the Linux AMD64 binary, then generate the OpenCode config. |
 | `make gen-opencode-darwin-arm64` | Build the macOS ARM64 binary, then generate the OpenCode config. |

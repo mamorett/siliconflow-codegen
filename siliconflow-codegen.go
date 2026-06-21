@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -199,35 +198,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		os.Setenv("ANTHROPIC_MODEL", selected)
-		os.Setenv("ANTHROPIC_API_KEY", os.Getenv("SILICONFLOW_API_KEY"))
-		os.Setenv("ANTHROPIC_BASE_URL", "https://api.siliconflow.com/")
-
-		shell := os.Getenv("SHELL")
-		if shell == "" {
-			if os.PathSeparator == '/' {
-				shell = "/bin/zsh"
-			} else {
-				shell = "cmd.exe"
-			}
-		}
-
-		fmt.Fprintf(os.Stderr, "Spawning a new shell session with ANTHROPIC_MODEL=%s...\n", selected)
-		fmt.Fprintf(os.Stderr, "(Type 'exit' or press Ctrl+D to return to your parent shell)\n")
-
-		cmd := exec.Command(shell)
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Run(); err != nil {
-			var exitErr *exec.ExitError
-			if errors.As(err, &exitErr) {
-				os.Exit(exitErr.ExitCode())
-			}
-			fmt.Fprintf(os.Stderr, "ERROR: running shell: %v\n", err)
-			os.Exit(1)
-		}
+		fmt.Fprintln(os.Stdout, selected)
 	default:
 		printRawResponse(body)
 	}
