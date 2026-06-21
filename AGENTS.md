@@ -8,7 +8,7 @@ This repository is a small Go command-line tool, `siliconflow-codegen`, that fet
 - an OpenCode-compatible provider config
 - a Crush-compatible provider config
 - a Qwencode-compatible provider config
-- an interactive shell environment configuration for Claude Code (`--claude`)
+- an interactive configuration and shell environment exporter for Claude Code (`--claude`)
 
 It is intentionally narrow: one package, one source file, one test file, and a Makefile that wraps build/test/generation commands.
 

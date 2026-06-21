@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -198,7 +199,16 @@ func main() {
 			os.Exit(1)
 		}
 
-		fmt.Fprintln(os.Stdout, selected)
+		if err := updateClaudeSettings(selected, apiKey); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: updating Claude Code settings: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Fprintf(os.Stderr, "Successfully updated Claude Code configuration in ~/.claude/settings.json\n\n")
+
+		fmt.Fprintf(os.Stdout, "export ANTHROPIC_BASE_URL=\"https://api.siliconflow.com/\"\n")
+		fmt.Fprintf(os.Stdout, "export ANTHROPIC_MODEL=%q\n", selected)
+		fmt.Fprintf(os.Stdout, "export ANTHROPIC_API_KEY=%q\n", apiKey)
 	default:
 		printRawResponse(body)
 	}
@@ -514,6 +524,70 @@ func writeModelGrid(output io.Writer, models []string, cols int) error {
 		if _, err := fmt.Fprintln(output); err != nil {
 			return fmt.Errorf("ERROR: writing model list: %w", err)
 		}
+	}
+
+	return nil
+}
+
+func updateClaudeSettings(selectedModel, apiKey string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("ERROR: obtaining home directory: %w", err)
+	}
+	settingsPath := filepath.Join(homeDir, ".claude", "settings.json")
+	return updateClaudeSettingsFile(settingsPath, selectedModel, apiKey)
+}
+
+func updateClaudeSettingsFile(settingsPath, selectedModel, apiKey string) error {
+	dir := filepath.Dir(settingsPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("ERROR: creating directory %s: %w", dir, err)
+	}
+
+	var settings map[string]interface{}
+	data, err := os.ReadFile(settingsPath)
+	if err == nil {
+		if err := json.Unmarshal(data, &settings); err != nil {
+			return fmt.Errorf("ERROR: parsing existing settings JSON at %s: %w", settingsPath, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("ERROR: reading %s: %w", settingsPath, err)
+	}
+
+	if settings == nil {
+		settings = make(map[string]interface{})
+	}
+
+	var envMap map[string]interface{}
+	if envVal, ok := settings["env"]; ok {
+		if m, ok := envVal.(map[string]interface{}); ok {
+			envMap = m
+		} else {
+			return fmt.Errorf("ERROR: 'env' key in existing settings JSON is not an object")
+		}
+	}
+	if envMap == nil {
+		envMap = make(map[string]interface{})
+		settings["env"] = envMap
+	}
+
+	envMap["ANTHROPIC_BASE_URL"] = "https://api.siliconflow.com/"
+	envMap["ANTHROPIC_MODEL"] = selectedModel
+	envMap["ANTHROPIC_API_KEY"] = apiKey
+
+	encoded, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("ERROR: encoding settings JSON: %w", err)
+	}
+
+	tmpPath := settingsPath + ".tmp"
+	if err := os.WriteFile(tmpPath, append(encoded, '\n'), 0644); err != nil {
+		return fmt.Errorf("ERROR: writing temporary settings file %s: %w", tmpPath, err)
+	}
+
+	if err := os.Rename(tmpPath, settingsPath); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("ERROR: renaming temporary settings file: %w", err)
 	}
 
 	return nil

@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -245,5 +247,120 @@ func TestChooseColumnCountPrefersSquareLayout(t *testing.T) {
 func TestPromptForModelRejectsEmptyList(t *testing.T) {
 	if _, err := promptForModel(nil, &bytes.Buffer{}, &bytes.Buffer{}); err == nil {
 		t.Fatal("promptForModel returned nil error for empty model list")
+	}
+}
+
+func TestUpdateClaudeSettingsFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	settingsPath := filepath.Join(tmpDir, "settings.json")
+
+	// Test 1: File does not exist yet.
+	err := updateClaudeSettingsFile(settingsPath, "deepseek-ai/DeepSeek-V3", "test-api-key")
+	if err != nil {
+		t.Fatalf("unexpected error updating non-existent settings file: %v", err)
+	}
+
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("failed to read created settings file: %v", err)
+	}
+
+	var settings map[string]interface{}
+	if err := json.Unmarshal(data, &settings); err != nil {
+		t.Fatalf("failed to parse created settings file JSON: %v", err)
+	}
+
+	envVal, ok := settings["env"]
+	if !ok {
+		t.Fatal("missing 'env' block in created settings")
+	}
+	envMap, ok := envVal.(map[string]interface{})
+	if !ok {
+		t.Fatal("'env' is not a JSON object")
+	}
+
+	if envMap["ANTHROPIC_BASE_URL"] != "https://api.siliconflow.com/" {
+		t.Errorf("expected ANTHROPIC_BASE_URL to be 'https://api.siliconflow.com/', got %v", envMap["ANTHROPIC_BASE_URL"])
+	}
+	if envMap["ANTHROPIC_MODEL"] != "deepseek-ai/DeepSeek-V3" {
+		t.Errorf("expected ANTHROPIC_MODEL to be 'deepseek-ai/DeepSeek-V3', got %v", envMap["ANTHROPIC_MODEL"])
+	}
+	if envMap["ANTHROPIC_API_KEY"] != "test-api-key" {
+		t.Errorf("expected ANTHROPIC_API_KEY to be 'test-api-key', got %v", envMap["ANTHROPIC_API_KEY"])
+	}
+
+	// Test 2: File exists and has unrelated settings that must be preserved.
+	existingData := `{
+  "customInstructions": "be concise",
+  "env": {
+    "OTHER_VAR": "keep-me",
+    "ANTHROPIC_MODEL": "old-model"
+  }
+}`
+	if err := os.WriteFile(settingsPath, []byte(existingData), 0644); err != nil {
+		t.Fatalf("failed to write existing data: %v", err)
+	}
+
+	err = updateClaudeSettingsFile(settingsPath, "deepseek-ai/DeepSeek-Coder-V2-Instruct", "new-api-key")
+	if err != nil {
+		t.Fatalf("unexpected error updating existing settings file: %v", err)
+	}
+
+	data, err = os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("failed to read updated settings file: %v", err)
+	}
+
+	settings = nil
+	if err := json.Unmarshal(data, &settings); err != nil {
+		t.Fatalf("failed to parse updated settings file JSON: %v", err)
+	}
+
+	if settings["customInstructions"] != "be concise" {
+		t.Errorf("expected customInstructions to be preserved, got %v", settings["customInstructions"])
+	}
+
+	envVal, ok = settings["env"]
+	if !ok {
+		t.Fatal("missing 'env' block in updated settings")
+	}
+	envMap, ok = envVal.(map[string]interface{})
+	if !ok {
+		t.Fatal("'env' is not a JSON object")
+	}
+
+	if envMap["OTHER_VAR"] != "keep-me" {
+		t.Errorf("expected OTHER_VAR to be preserved, got %v", envMap["OTHER_VAR"])
+	}
+	if envMap["ANTHROPIC_BASE_URL"] != "https://api.siliconflow.com/" {
+		t.Errorf("expected ANTHROPIC_BASE_URL to be updated, got %v", envMap["ANTHROPIC_BASE_URL"])
+	}
+	if envMap["ANTHROPIC_MODEL"] != "deepseek-ai/DeepSeek-Coder-V2-Instruct" {
+		t.Errorf("expected ANTHROPIC_MODEL to be updated, got %v", envMap["ANTHROPIC_MODEL"])
+	}
+	if envMap["ANTHROPIC_API_KEY"] != "new-api-key" {
+		t.Errorf("expected ANTHROPIC_API_KEY to be updated, got %v", envMap["ANTHROPIC_API_KEY"])
+	}
+
+	// Test 3: Existing settings file has invalid JSON (must abort with error)
+	invalidData := `{"env": {`
+	if err := os.WriteFile(settingsPath, []byte(invalidData), 0644); err != nil {
+		t.Fatalf("failed to write invalid data: %v", err)
+	}
+
+	err = updateClaudeSettingsFile(settingsPath, "some-model", "some-key")
+	if err == nil {
+		t.Fatal("expected error when updating settings file with invalid JSON, got nil")
+	}
+
+	// Test 4: Existing settings file has 'env' key that is not an object
+	invalidEnvData := `{"env": "not-an-object"}`
+	if err := os.WriteFile(settingsPath, []byte(invalidEnvData), 0644); err != nil {
+		t.Fatalf("failed to write invalid env data: %v", err)
+	}
+
+	err = updateClaudeSettingsFile(settingsPath, "some-model", "some-key")
+	if err == nil {
+		t.Fatal("expected error when 'env' key is not an object, got nil")
 	}
 }

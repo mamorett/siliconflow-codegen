@@ -177,20 +177,23 @@ make gen-crush CRUSH_CONFIG=crush-providers/siliconflow.json
 
 ## Set the model for Claude Code CLI
 
-You can use the `--claude` flag to interactively select a model from SiliconFlow and assign it directly to `ANTHROPIC_MODEL` in your terminal shell.
+You can use the `--claude` flag to interactively select a model from SiliconFlow and assign it directly to Claude Code's environment.
 
-Because standard output is used only to print the selected model ID, you can use command substitution to set the environment variable:
+To make the selection persistent across sessions, the tool automatically updates your `~/.claude/settings.json` file, mapping:
+* `ANTHROPIC_BASE_URL` to `"https://api.siliconflow.com/"`
+* `ANTHROPIC_MODEL` to the selected model ID (e.g. `"deepseek-ai/DeepSeek-V3"`)
+* `ANTHROPIC_API_KEY` to the value of your `$SILICONFLOW_API_KEY`
+
+Additionally, the tool outputs shell export statements on `stdout` so you can set these variables immediately in your current terminal session using `eval`:
 
 ```bash
-export ANTHROPIC_MODEL=$(./dist/siliconflow-codegen --claude)
-claude
+eval $(./dist/siliconflow-codegen --claude)
 ```
 
 Using `make`:
 
 ```bash
-export ANTHROPIC_MODEL=$(make -s claude)
-claude
+eval $(make -s claude)
 ```
 
 ### How it works
@@ -198,8 +201,8 @@ claude
 1. It fetches the latest model list from SiliconFlow.
 2. It displays a clean, column-aligned grid of available models on `stderr`.
 3. It prompts you to enter a number to make a selection.
-4. It prints **only** the selected model ID to `stdout` (e.g., `deepseek-ai/DeepSeek-V3`).
-5. The shell captures the printed ID and exports it to `ANTHROPIC_MODEL`.
+4. It updates (or creates) `~/.claude/settings.json` with the environment variables.
+5. It prints the `export` shell commands to `stdout`, allowing `eval` to update the current shell session.
 
 ## Generated OpenCode config shape
 
@@ -408,7 +411,7 @@ siliconflow.opencode.json
 | `make gen-opencode` | Generate `siliconflow.opencode.json` using `go run . --gen-opencode`. |
 | `make gen-crush` | Generate `siliconflow.crush.json` using `go run . --gen-crush`. |
 | `make gen-qwencode` | Generate `siliconflow.qwencode.json` using `go run . --gen-qwencode`. |
-| `make claude` | Interactively select a SiliconFlow model and output its ID to stdout. |
+| `make claude` | Interactively select a SiliconFlow model, update Claude Code settings, and print exports. |
 | `make gen-opencode-linux-arm64` | Build the Linux ARM64 binary, then generate the OpenCode config. |
 | `make gen-opencode-linux-amd64` | Build the Linux AMD64 binary, then generate the OpenCode config. |
 | `make gen-opencode-darwin-arm64` | Build the macOS ARM64 binary, then generate the OpenCode config. |
