@@ -209,6 +209,9 @@ func main() {
 		fmt.Fprintf(os.Stdout, "export ANTHROPIC_BASE_URL=\"https://api.siliconflow.com/\"\n")
 		fmt.Fprintf(os.Stdout, "export ANTHROPIC_MODEL=%q\n", selected)
 		fmt.Fprintf(os.Stdout, "export ANTHROPIC_API_KEY=%q\n", apiKey)
+		fmt.Fprintf(os.Stdout, "export DISABLE_NON_ESSENTIAL_MODEL_CALLS=\"1\"\n")
+		fmt.Fprintf(os.Stdout, "export DISABLE_TELEMETRY=\"1\"\n")
+		fmt.Fprintf(os.Stdout, "export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=\"1\"\n")
 	default:
 		printRawResponse(body)
 	}
@@ -574,6 +577,9 @@ func updateClaudeSettingsFile(settingsPath, selectedModel, apiKey string) error 
 	envMap["ANTHROPIC_BASE_URL"] = "https://api.siliconflow.com/"
 	envMap["ANTHROPIC_MODEL"] = selectedModel
 	envMap["ANTHROPIC_API_KEY"] = apiKey
+	envMap["DISABLE_NON_ESSENTIAL_MODEL_CALLS"] = "1"
+	envMap["DISABLE_TELEMETRY"] = "1"
+	envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] = "1"
 
 	encoded, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {

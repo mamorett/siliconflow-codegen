@@ -288,6 +288,15 @@ func TestUpdateClaudeSettingsFile(t *testing.T) {
 	if envMap["ANTHROPIC_API_KEY"] != "test-api-key" {
 		t.Errorf("expected ANTHROPIC_API_KEY to be 'test-api-key', got %v", envMap["ANTHROPIC_API_KEY"])
 	}
+	if envMap["DISABLE_NON_ESSENTIAL_MODEL_CALLS"] != "1" {
+		t.Errorf("expected DISABLE_NON_ESSENTIAL_MODEL_CALLS to be '1', got %v", envMap["DISABLE_NON_ESSENTIAL_MODEL_CALLS"])
+	}
+	if envMap["DISABLE_TELEMETRY"] != "1" {
+		t.Errorf("expected DISABLE_TELEMETRY to be '1', got %v", envMap["DISABLE_TELEMETRY"])
+	}
+	if envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] != "1" {
+		t.Errorf("expected CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS to be '1', got %v", envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"])
+	}
 
 	// Test 2: File exists and has unrelated settings that must be preserved.
 	existingData := `{
@@ -340,6 +349,15 @@ func TestUpdateClaudeSettingsFile(t *testing.T) {
 	}
 	if envMap["ANTHROPIC_API_KEY"] != "new-api-key" {
 		t.Errorf("expected ANTHROPIC_API_KEY to be updated, got %v", envMap["ANTHROPIC_API_KEY"])
+	}
+	if envMap["DISABLE_NON_ESSENTIAL_MODEL_CALLS"] != "1" {
+		t.Errorf("expected DISABLE_NON_ESSENTIAL_MODEL_CALLS to be updated, got %v", envMap["DISABLE_NON_ESSENTIAL_MODEL_CALLS"])
+	}
+	if envMap["DISABLE_TELEMETRY"] != "1" {
+		t.Errorf("expected DISABLE_TELEMETRY to be updated, got %v", envMap["DISABLE_TELEMETRY"])
+	}
+	if envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] != "1" {
+		t.Errorf("expected CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS to be updated, got %v", envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"])
 	}
 
 	// Test 3: Existing settings file has invalid JSON (must abort with error)
