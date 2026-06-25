@@ -204,9 +204,15 @@ func main() {
 			os.Exit(1)
 		}
 
-		fmt.Fprintf(os.Stderr, "Successfully updated Claude Code configuration in ~/.claude/settings.json\n\n")
+		if err := updateClaudeCodeRouter(selected, apiKey); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: updating Claude Code Router config: %v\n", err)
+			os.Exit(1)
+		}
 
-		fmt.Fprintf(os.Stdout, "export ANTHROPIC_BASE_URL=\"https://api.siliconflow.com/\"\n")
+		fmt.Fprintf(os.Stderr, "Successfully updated Claude Code configuration in ~/.claude/settings.json\n")
+		fmt.Fprintf(os.Stderr, "Successfully updated Claude Code Router configuration in ~/.claude-code-router/config.json\n\n")
+
+		fmt.Fprintf(os.Stdout, "export ANTHROPIC_BASE_URL=\"http://localhost:3456\"\n")
 		fmt.Fprintf(os.Stdout, "export ANTHROPIC_MODEL=%q\n", selected)
 		fmt.Fprintf(os.Stdout, "export ANTHROPIC_API_KEY=%q\n", apiKey)
 		fmt.Fprintf(os.Stdout, "export DISABLE_NON_ESSENTIAL_MODEL_CALLS=\"1\"\n")
@@ -574,14 +580,12 @@ func updateClaudeSettingsFile(settingsPath, selectedModel, apiKey string) error 
 		settings["env"] = envMap
 	}
 
-	envMap["ANTHROPIC_BASE_URL"] = "https://api.siliconflow.com/"
+	envMap["ANTHROPIC_BASE_URL"] = "http://localhost:3456"
 	envMap["ANTHROPIC_MODEL"] = selectedModel
 	envMap["ANTHROPIC_API_KEY"] = apiKey
 	envMap["DISABLE_NON_ESSENTIAL_MODEL_CALLS"] = "1"
 	envMap["DISABLE_TELEMETRY"] = "1"
 	envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] = "1"
-
-	settings["alwaysThinkingEnabled"] = false
 
 	encoded, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
@@ -596,6 +600,116 @@ func updateClaudeSettingsFile(settingsPath, selectedModel, apiKey string) error 
 	if err := os.Rename(tmpPath, settingsPath); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("ERROR: renaming temporary settings file: %w", err)
+	}
+
+	return nil
+}
+
+func updateClaudeCodeRouter(selectedModel, apiKey string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("ERROR: obtaining home directory: %w", err)
+	}
+	routerConfigPath := filepath.Join(homeDir, ".claude-code-router", "config.json")
+	return updateClaudeCodeRouterFile(routerConfigPath, selectedModel, apiKey)
+}
+
+func updateClaudeCodeRouterFile(routerConfigPath, selectedModel, apiKey string) error {
+	dir := filepath.Dir(routerConfigPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("ERROR: creating directory %s: %w", dir, err)
+	}
+
+	var config map[string]interface{}
+	data, err := os.ReadFile(routerConfigPath)
+	if err == nil {
+		if err := json.Unmarshal(data, &config); err != nil {
+			return fmt.Errorf("ERROR: parsing existing router config JSON at %s: %w", routerConfigPath, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("ERROR: reading %s: %w", routerConfigPath, err)
+	}
+
+	if config == nil {
+		config = make(map[string]interface{})
+	}
+
+	var providersList []interface{}
+	if provVal, ok := config["Providers"]; ok {
+		if pl, ok := provVal.([]interface{}); ok {
+			providersList = pl
+		}
+	}
+
+	var siliconflowProvider map[string]interface{}
+	for _, prov := range providersList {
+		if pm, ok := prov.(map[string]interface{}); ok {
+			if pm["name"] == "siliconflow" {
+				siliconflowProvider = pm
+				break
+			}
+		}
+	}
+
+	if siliconflowProvider == nil {
+		siliconflowProvider = make(map[string]interface{})
+		siliconflowProvider["name"] = "siliconflow"
+		siliconflowProvider["api_base_url"] = "https://api.siliconflow.com/v1"
+		providersList = append(providersList, siliconflowProvider)
+	}
+
+	siliconflowProvider["api_key"] = apiKey
+
+	var models []interface{}
+	if modelVal, ok := siliconflowProvider["models"]; ok {
+		if ml, ok := modelVal.([]interface{}); ok {
+			models = ml
+		}
+	}
+
+	found := false
+	for _, m := range models {
+		if mStr, ok := m.(string); ok && mStr == selectedModel {
+			found = true
+			break
+		}
+	}
+	if !found {
+		models = append(models, selectedModel)
+	}
+	siliconflowProvider["models"] = models
+	config["Providers"] = providersList
+
+	var routerMap map[string]interface{}
+	if rVal, ok := config["Router"]; ok {
+		if rm, ok := rVal.(map[string]interface{}); ok {
+			routerMap = rm
+		}
+	}
+	if routerMap == nil {
+		routerMap = make(map[string]interface{})
+		config["Router"] = routerMap
+	}
+
+	routerMap["default"] = "siliconflow," + selectedModel
+
+	if strings.Contains(strings.ToLower(selectedModel), "r1") {
+		routerMap["think"] = "siliconflow," + selectedModel
+	}
+
+	encoded, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("ERROR: encoding router config JSON: %w", err)
+	}
+
+	tmpPath := routerConfigPath + ".tmp"
+	if err := os.WriteFile(tmpPath, append(encoded, '\n'), 0644); err != nil {
+		return fmt.Errorf("ERROR: writing temporary router config file %s: %w", tmpPath, err)
+	}
+
+	if err := os.Rename(tmpPath, routerConfigPath); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("ERROR: renaming temporary router config file: %w", err)
 	}
 
 	return nil

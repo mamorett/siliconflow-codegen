@@ -279,8 +279,8 @@ func TestUpdateClaudeSettingsFile(t *testing.T) {
 		t.Fatal("'env' is not a JSON object")
 	}
 
-	if envMap["ANTHROPIC_BASE_URL"] != "https://api.siliconflow.com/" {
-		t.Errorf("expected ANTHROPIC_BASE_URL to be 'https://api.siliconflow.com/', got %v", envMap["ANTHROPIC_BASE_URL"])
+	if envMap["ANTHROPIC_BASE_URL"] != "http://localhost:3456" {
+		t.Errorf("expected ANTHROPIC_BASE_URL to be 'http://localhost:3456', got %v", envMap["ANTHROPIC_BASE_URL"])
 	}
 	if envMap["ANTHROPIC_MODEL"] != "deepseek-ai/DeepSeek-V3" {
 		t.Errorf("expected ANTHROPIC_MODEL to be 'deepseek-ai/DeepSeek-V3', got %v", envMap["ANTHROPIC_MODEL"])
@@ -296,13 +296,6 @@ func TestUpdateClaudeSettingsFile(t *testing.T) {
 	}
 	if envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] != "1" {
 		t.Errorf("expected CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS to be '1', got %v", envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"])
-	}
-	alwaysThinkingVal, ok := settings["alwaysThinkingEnabled"]
-	if !ok {
-		t.Fatal("missing 'alwaysThinkingEnabled' in created settings")
-	}
-	if alwaysThinkingVal != false {
-		t.Errorf("expected alwaysThinkingEnabled to be false, got %v", alwaysThinkingVal)
 	}
 
 	// Test 2: File exists and has unrelated settings that must be preserved.
@@ -348,7 +341,7 @@ func TestUpdateClaudeSettingsFile(t *testing.T) {
 	if envMap["OTHER_VAR"] != "keep-me" {
 		t.Errorf("expected OTHER_VAR to be preserved, got %v", envMap["OTHER_VAR"])
 	}
-	if envMap["ANTHROPIC_BASE_URL"] != "https://api.siliconflow.com/" {
+	if envMap["ANTHROPIC_BASE_URL"] != "http://localhost:3456" {
 		t.Errorf("expected ANTHROPIC_BASE_URL to be updated, got %v", envMap["ANTHROPIC_BASE_URL"])
 	}
 	if envMap["ANTHROPIC_MODEL"] != "deepseek-ai/DeepSeek-Coder-V2-Instruct" {
@@ -365,13 +358,6 @@ func TestUpdateClaudeSettingsFile(t *testing.T) {
 	}
 	if envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] != "1" {
 		t.Errorf("expected CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS to be updated, got %v", envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"])
-	}
-	alwaysThinkingVal, ok = settings["alwaysThinkingEnabled"]
-	if !ok {
-		t.Fatal("missing 'alwaysThinkingEnabled' in updated settings")
-	}
-	if alwaysThinkingVal != false {
-		t.Errorf("expected alwaysThinkingEnabled to be false, got %v", alwaysThinkingVal)
 	}
 
 	// Test 3: Existing settings file has invalid JSON (must abort with error)
@@ -394,5 +380,118 @@ func TestUpdateClaudeSettingsFile(t *testing.T) {
 	err = updateClaudeSettingsFile(settingsPath, "some-model", "some-key")
 	if err == nil {
 		t.Fatal("expected error when 'env' key is not an object, got nil")
+	}
+}
+
+func TestUpdateClaudeCodeRouterFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+
+	// Test 1: Config does not exist yet.
+	err := updateClaudeCodeRouterFile(configPath, "deepseek-ai/DeepSeek-V3", "test-api-key")
+	if err != nil {
+		t.Fatalf("unexpected error updating non-existent router config file: %v", err)
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to read created router config file: %v", err)
+	}
+
+	var config map[string]interface{}
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatalf("failed to parse created router config file JSON: %v", err)
+	}
+
+	providersVal, ok := config["Providers"]
+	if !ok {
+		t.Fatal("missing 'Providers' block in created router config")
+	}
+	providersList, ok := providersVal.([]interface{})
+	if !ok {
+		t.Fatal("'Providers' is not a list")
+	}
+	if len(providersList) != 1 {
+		t.Fatalf("expected 1 provider, got %d", len(providersList))
+	}
+
+	siliconflowProvider, ok := providersList[0].(map[string]interface{})
+	if !ok {
+		t.Fatal("provider is not a JSON object")
+	}
+	if siliconflowProvider["name"] != "siliconflow" {
+		t.Errorf("expected provider name to be 'siliconflow', got %v", siliconflowProvider["name"])
+	}
+	if siliconflowProvider["api_base_url"] != "https://api.siliconflow.com/v1" {
+		t.Errorf("expected api_base_url to be 'https://api.siliconflow.com/v1', got %v", siliconflowProvider["api_base_url"])
+	}
+	if siliconflowProvider["api_key"] != "test-api-key" {
+		t.Errorf("expected api_key to be 'test-api-key', got %v", siliconflowProvider["api_key"])
+	}
+
+	modelsVal, ok := siliconflowProvider["models"]
+	if !ok {
+		t.Fatal("missing 'models' in provider")
+	}
+	modelsList, ok := modelsVal.([]interface{})
+	if !ok {
+		t.Fatal("'models' is not a list")
+	}
+	if len(modelsList) != 1 || modelsList[0] != "deepseek-ai/DeepSeek-V3" {
+		t.Errorf("expected models to contain 'deepseek-ai/DeepSeek-V3', got %v", modelsList)
+	}
+
+	routerVal, ok := config["Router"]
+	if !ok {
+		t.Fatal("missing 'Router' block")
+	}
+	routerMap, ok := routerVal.(map[string]interface{})
+	if !ok {
+		t.Fatal("'Router' is not a JSON object")
+	}
+	if routerMap["default"] != "siliconflow,deepseek-ai/DeepSeek-V3" {
+		t.Errorf("expected Router.default to be 'siliconflow,deepseek-ai/DeepSeek-V3', got %v", routerMap["default"])
+	}
+	if routerMap["think"] != nil {
+		t.Errorf("expected Router.think to be unset, got %v", routerMap["think"])
+	}
+
+	// Test 2: Reasoning model (containing "r1") updates "think" field
+	err = updateClaudeCodeRouterFile(configPath, "deepseek-ai/DeepSeek-R1", "new-api-key")
+	if err != nil {
+		t.Fatalf("unexpected error updating existing router config file: %v", err)
+	}
+
+	data, err = os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to read updated router config: %v", err)
+	}
+
+	config = nil
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatalf("failed to parse updated config JSON: %v", err)
+	}
+
+	providersVal = config["Providers"]
+	providersList = providersVal.([]interface{})
+	siliconflowProvider = providersList[0].(map[string]interface{})
+	modelsVal = siliconflowProvider["models"]
+	modelsList = modelsVal.([]interface{})
+
+	// Should contain both models now
+	if len(modelsList) != 2 {
+		t.Fatalf("expected 2 models, got %d (%v)", len(modelsList), modelsList)
+	}
+	if siliconflowProvider["api_key"] != "new-api-key" {
+		t.Errorf("expected api_key to be updated to 'new-api-key', got %v", siliconflowProvider["api_key"])
+	}
+
+	routerVal = config["Router"]
+	routerMap = routerVal.(map[string]interface{})
+	if routerMap["default"] != "siliconflow,deepseek-ai/DeepSeek-R1" {
+		t.Errorf("expected Router.default to be 'siliconflow,deepseek-ai/DeepSeek-R1', got %v", routerMap["default"])
+	}
+	if routerMap["think"] != "siliconflow,deepseek-ai/DeepSeek-R1" {
+		t.Errorf("expected Router.think to be 'siliconflow,deepseek-ai/DeepSeek-R1', got %v", routerMap["think"])
 	}
 }
