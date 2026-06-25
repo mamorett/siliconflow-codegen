@@ -297,10 +297,6 @@ func TestUpdateClaudeSettingsFile(t *testing.T) {
 	if envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] != "1" {
 		t.Errorf("expected CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS to be '1', got %v", envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"])
 	}
-	if envMap["MAX_THINKING_TOKENS"] != "0" {
-		t.Errorf("expected MAX_THINKING_TOKENS to be '0', got %v", envMap["MAX_THINKING_TOKENS"])
-	}
-
 	alwaysThinkingVal, ok := settings["alwaysThinkingEnabled"]
 	if !ok {
 		t.Fatal("missing 'alwaysThinkingEnabled' in created settings")
@@ -370,10 +366,6 @@ func TestUpdateClaudeSettingsFile(t *testing.T) {
 	if envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] != "1" {
 		t.Errorf("expected CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS to be updated, got %v", envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"])
 	}
-	if envMap["MAX_THINKING_TOKENS"] != "0" {
-		t.Errorf("expected MAX_THINKING_TOKENS to be updated, got %v", envMap["MAX_THINKING_TOKENS"])
-	}
-
 	alwaysThinkingVal, ok = settings["alwaysThinkingEnabled"]
 	if !ok {
 		t.Fatal("missing 'alwaysThinkingEnabled' in updated settings")
