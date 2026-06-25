@@ -659,6 +659,9 @@ func updateClaudeCodeRouterFile(routerConfigPath, selectedModel, apiKey string) 
 	}
 
 	siliconflowProvider["api_key"] = apiKey
+	siliconflowProvider["transformer"] = map[string]interface{}{
+		"use": []interface{}{"openai"},
+	}
 
 	var models []interface{}
 	if modelVal, ok := siliconflowProvider["models"]; ok {

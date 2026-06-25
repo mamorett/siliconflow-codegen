@@ -429,6 +429,23 @@ func TestUpdateClaudeCodeRouterFile(t *testing.T) {
 		t.Errorf("expected api_key to be 'test-api-key', got %v", siliconflowProvider["api_key"])
 	}
 
+	transformerVal, ok := siliconflowProvider["transformer"]
+	if !ok {
+		t.Fatal("missing 'transformer' in provider")
+	}
+	transformerMap, ok := transformerVal.(map[string]interface{})
+	if !ok {
+		t.Fatal("'transformer' is not a JSON object")
+	}
+	useVal, ok := transformerMap["use"]
+	if !ok {
+		t.Fatal("missing 'use' in transformer")
+	}
+	useList, ok := useVal.([]interface{})
+	if !ok || len(useList) != 1 || useList[0] != "openai" {
+		t.Errorf("expected transformer.use to contain 'openai', got %v", useVal)
+	}
+
 	modelsVal, ok := siliconflowProvider["models"]
 	if !ok {
 		t.Fatal("missing 'models' in provider")
