@@ -180,9 +180,20 @@ make gen-crush CRUSH_CONFIG=crush-providers/siliconflow.json
 You can use the `--claude` flag to interactively select a model from SiliconFlow and assign it directly to Claude Code's environment.
 
 To make the selection persistent across sessions, the tool automatically updates your `~/.claude/settings.json` file, mapping:
-* `ANTHROPIC_BASE_URL` to `"https://api.siliconflow.com/"`
+* `ANTHROPIC_BASE_URL` to `"http://localhost:3456"` (the local Claude Code Router proxy)
 * `ANTHROPIC_MODEL` to the selected model ID (e.g. `"deepseek-ai/DeepSeek-V3"`)
 * `ANTHROPIC_API_KEY` to the value of your `$SILICONFLOW_API_KEY`
+
+Additionally, it automatically configures `~/.claude-code-router/config.json` by adding or updating the `siliconflow` provider with:
+* `api_base_url` set to the full chat completions endpoint: `"https://api.siliconflow.com/v1/chat/completions"`
+* `transformer.use` set to `["OpenAI"]` (and dynamically appends `"reasoning"` if a reasoning model like R1 is selected)
+
+> [!IMPORTANT]
+> After updating the configuration, you must restart your Claude Code Router service for the changes to take effect:
+> ```bash
+> ccr restart
+> ccr code # to start Claude Code with the router
+> ```
 
 Additionally, the tool outputs shell export statements on `stdout` so you can set these variables immediately in your current terminal session using `eval`:
 
@@ -202,7 +213,8 @@ eval $(make -s claude)
 2. It displays a clean, column-aligned grid of available models on `stderr`.
 3. It prompts you to enter a number to make a selection.
 4. It updates (or creates) `~/.claude/settings.json` with the environment variables.
-5. It prints the `export` shell commands to `stdout`, allowing `eval` to update the current shell session.
+5. It updates (or creates) `~/.claude-code-router/config.json` with SiliconFlow provider settings.
+6. It prints the `export` shell commands to `stdout`, allowing `eval` to update the current shell session.
 
 ## Generated OpenCode config shape
 

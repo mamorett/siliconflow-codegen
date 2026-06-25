@@ -654,13 +654,23 @@ func updateClaudeCodeRouterFile(routerConfigPath, selectedModel, apiKey string) 
 	if siliconflowProvider == nil {
 		siliconflowProvider = make(map[string]interface{})
 		siliconflowProvider["name"] = "siliconflow"
-		siliconflowProvider["api_base_url"] = "https://api.siliconflow.com/v1"
 		providersList = append(providersList, siliconflowProvider)
+	}
+
+	siliconflowProvider["api_base_url"] = "https://api.siliconflow.com/v1/chat/completions"
+
+	isReasoning := strings.Contains(strings.ToLower(selectedModel), "r1") ||
+		strings.Contains(strings.ToLower(selectedModel), "reasoner") ||
+		strings.Contains(strings.ToLower(selectedModel), "think")
+
+	useList := []interface{}{"OpenAI"}
+	if isReasoning {
+		useList = append(useList, "reasoning")
 	}
 
 	siliconflowProvider["api_key"] = apiKey
 	siliconflowProvider["transformer"] = map[string]interface{}{
-		"use": []interface{}{"openai"},
+		"use": useList,
 	}
 
 	var models []interface{}
