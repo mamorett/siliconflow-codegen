@@ -212,6 +212,7 @@ func main() {
 		fmt.Fprintf(os.Stdout, "export DISABLE_NON_ESSENTIAL_MODEL_CALLS=\"1\"\n")
 		fmt.Fprintf(os.Stdout, "export DISABLE_TELEMETRY=\"1\"\n")
 		fmt.Fprintf(os.Stdout, "export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=\"1\"\n")
+		fmt.Fprintf(os.Stdout, "export MAX_THINKING_TOKENS=\"0\"\n")
 	default:
 		printRawResponse(body)
 	}
@@ -580,6 +581,9 @@ func updateClaudeSettingsFile(settingsPath, selectedModel, apiKey string) error 
 	envMap["DISABLE_NON_ESSENTIAL_MODEL_CALLS"] = "1"
 	envMap["DISABLE_TELEMETRY"] = "1"
 	envMap["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] = "1"
+	envMap["MAX_THINKING_TOKENS"] = "0"
+
+	settings["alwaysThinkingEnabled"] = false
 
 	encoded, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
