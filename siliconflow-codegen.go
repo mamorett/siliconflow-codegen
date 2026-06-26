@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -112,6 +113,7 @@ func main() {
 	genCrush := flag.Bool("gen-crush", false, "generate a Crush-compatible SiliconFlow provider config instead of printing the raw API response")
 	genQwencode := flag.Bool("gen-qwencode", false, "generate a Qwencode-compatible SiliconFlow provider config instead of printing the raw API response")
 	genClaude := flag.Bool("claude", false, "list SiliconFlow models and print an export command for ANTHROPIC_MODEL=<selected>")
+	listModels := flag.Bool("model", false, "list SiliconFlow models as a JSON array of IDs")
 	flag.Parse()
 
 	requestedActions := 0
@@ -127,9 +129,17 @@ func main() {
 	if *genClaude {
 		requestedActions++
 	}
+	if *listModels {
+		requestedActions++
+	}
 	if requestedActions > 1 {
-		fmt.Fprintln(os.Stderr, "ERROR: only one of --gen-opencode, --gen-crush, --gen-qwencode, or --claude can be used at a time")
+		fmt.Fprintln(os.Stderr, "ERROR: only one of --gen-opencode, --gen-crush, --gen-qwencode, --claude, or --model can be used at a time")
 		os.Exit(1)
+	}
+
+	if requestedActions == 0 {
+		printUsage()
+		return
 	}
 
 	apiKey := os.Getenv("SILICONFLOW_API_KEY")
@@ -212,14 +222,33 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Successfully updated Claude Code configuration in ~/.claude/settings.json\n")
 		fmt.Fprintf(os.Stderr, "Successfully updated Claude Code Router configuration in ~/.claude-code-router/config.json\n\n")
 
+		fmt.Fprintf(os.Stderr, "Restarting Claude Code Router to apply changes...\n")
+		if err := restartClaudeCodeRouter(); err != nil {
+			fmt.Fprintf(os.Stderr, "WARNING: failed to automatically restart Claude Code Router: %v\n", err)
+			fmt.Fprintf(os.Stderr, "         Run 'ccr restart' manually to apply the new configuration.\n\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "Successfully restarted Claude Code Router.\n\n")
+		}
+
 		fmt.Fprintf(os.Stdout, "export ANTHROPIC_BASE_URL=\"http://localhost:3456\"\n")
 		fmt.Fprintf(os.Stdout, "export ANTHROPIC_MODEL=%q\n", selected)
 		fmt.Fprintf(os.Stdout, "export ANTHROPIC_API_KEY=%q\n", apiKey)
 		fmt.Fprintf(os.Stdout, "export DISABLE_NON_ESSENTIAL_MODEL_CALLS=\"1\"\n")
 		fmt.Fprintf(os.Stdout, "export DISABLE_TELEMETRY=\"1\"\n")
 		fmt.Fprintf(os.Stdout, "export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=\"1\"\n")
+	case *listModels:
+		encoded, err := generateModelListJSON(body)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		if _, err := os.Stdout.Write(encoded); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: writing output: %v\n", err)
+			os.Exit(1)
+		}
 	default:
-		printRawResponse(body)
+		printUsage()
 	}
 }
 
@@ -441,15 +470,45 @@ func promptForModel(models []string, input io.Reader, output io.Writer) (string,
 	}
 }
 
-func printRawResponse(body []byte) {
-	if len(body) == 0 {
-		return
+func printUsage() {
+	out := os.Stdout
+	fmt.Fprintf(out, "Usage: %s [options]\n\n", filepath.Base(os.Args[0]))
+	fmt.Fprintf(out, "Run with one of the action flags to perform an action. By default, this message is shown.\n\n")
+	fmt.Fprintf(out, "Options:\n")
+
+	orig := flag.CommandLine.Output()
+	flag.CommandLine.SetOutput(out)
+	defer flag.CommandLine.SetOutput(orig)
+	flag.PrintDefaults()
+}
+
+func generateModelListJSON(body []byte) ([]byte, error) {
+	ids, err := parseModelIDs(body)
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return nil, errors.New("ERROR: no models found in API response")
 	}
 
-	os.Stdout.Write(body)
-	if body[len(body)-1] != '\n' {
-		os.Stdout.WriteString("\n")
+	encoded, err := json.MarshalIndent(ids, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("ERROR: encoding model list: %w", err)
 	}
+
+	return append(encoded, '\n'), nil
+}
+
+// restartClaudeCodeRouter invokes `ccr restart` so the new provider
+// configuration takes effect immediately. A failure here is non-fatal
+// because the configuration files have already been written; callers
+// are expected to surface the error as a warning and let the user
+// restart manually.
+func restartClaudeCodeRouter() error {
+	cmd := exec.Command("ccr", "restart")
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func longestID(models []string) int {

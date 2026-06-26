@@ -4,11 +4,13 @@
 
 This repository is a small Go command-line tool, `siliconflow-codegen`, that fetches the SiliconFlow model list and emits either:
 
-- the raw SiliconFlow API response
+- a sorted JSON array of model IDs (`--model`)
 - an OpenCode-compatible provider config
 - a Crush-compatible provider config
 - a Qwencode-compatible provider config
 - an interactive configuration and shell environment exporter for Claude Code (`--claude`)
+
+Running with no flags prints a usage message and exits successfully.
 
 It is intentionally narrow: one package, one source file, one test file, and a Makefile that wraps build/test/generation commands.
 
@@ -51,7 +53,7 @@ go run . --gen-crush
 
 Generated files:
 
-- `siliconflow.models.json` from `make raw-models`
+- `siliconflow.models.json` from `make raw-models` (sorted JSON array of model IDs)
 - `siliconflow.opencode.json` from `make gen-opencode`
 - `siliconflow.crush.json` from `make gen-crush`
 
@@ -64,7 +66,7 @@ make gen-crush CRUSH_CONFIG=path/to/file.json
 
 ## API key and secret handling
 
-`SILICONFLOW_API_KEY` is required for every run path, including raw model fetching.
+`SILICONFLOW_API_KEY` is required for every run path except the default usage message and unknown-flag errors.
 
 The tool must not write the real API key into generated configs:
 
@@ -109,12 +111,14 @@ The program is a single `package main` binary. Keep changes local and simple unl
 
 Important functions:
 
-- `main()` — parses flags, rejects simultaneous use of multiple generator/action flags, checks the API key, fetches models, and dispatches the requested output mode.
+- `main()` — parses flags, rejects simultaneous use of multiple generator/action flags, prints a usage message when no action flag is set, checks the API key, fetches models, and dispatches the requested output mode.
 - `fetchModels(apiKey string)` — performs the HTTP GET and validates status/body.
 - `generateOpenCodeConfig(body []byte)` — parses IDs, builds the OpenCode JSON shape, and writes JSON to stdout.
 - `generateCrushConfig(body []byte)` — parses IDs, builds the Crush JSON shape, and writes JSON to stdout.
+- `generateModelListJSON(body []byte)` — parses IDs and emits a sorted JSON array of model IDs (used by `--model`).
 - `parseModelIDs(body []byte)` — extracts, trims, deduplicates, and sorts model IDs.
-- `printRawResponse(body []byte)` — writes the raw API response to stdout and ensures a trailing newline.
+- `printUsage()` — writes the CLI usage message to stdout.
+- `restartClaudeCodeRouter()` — runs `ccr restart` so the new provider configuration takes effect after `--claude`. Failures are non-fatal.
 
 Model ID handling is shared by both generators:
 
@@ -153,7 +157,9 @@ When adding tests, prefer small focused tests around generator behavior and pars
 
 ## Gotchas
 
-- `--gen-opencode`, `--gen-crush`, `--gen-qwencode`, and `--claude` are mutually exclusive; running more than one exits with an error.
+- `--gen-opencode`, `--gen-crush`, `--gen-qwencode`, `--claude`, and `--model` are mutually exclusive; running more than one exits with an error.
+- `--claude` automatically invokes `ccr restart` after writing the configuration. If `ccr` is missing the run continues with a warning so the new configs are still applied once the user restarts manually.
+- Running with no flags prints a usage message and exits 0 (it does not call the SiliconFlow API).
 - `make gen-opencode`, `make gen-crush`, and `make gen-qwencode` overwrite their target files through shell redirection.
 - `make clean` removes `dist/` plus generated `siliconflow.opencode.json`, `siliconflow.crush.json`, `siliconflow.qwencode.json`, and `siliconflow.models.json`.
 - `dist/` is ignored by Git.

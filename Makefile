@@ -65,7 +65,7 @@ gen-opencode-darwin-arm64: $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64
 
 raw-models:
 	@test -n "$${SILICONFLOW_API_KEY}" || { echo "ERROR: SILICONFLOW_API_KEY is required" >&2; exit 1; }
-	go run . > siliconflow.models.json
+	go run . --model > siliconflow.models.json
 
 models: raw-models
 
@@ -87,11 +87,11 @@ help:
 	@echo "  gen-opencode                  Generate $(OPENCODE_CONFIG) with the local Go toolchain"
 	@echo "  gen-crush                     Generate $(CRUSH_CONFIG) with the local Go toolchain"
 	@echo "  gen-qwencode                  Generate $(QWENCODE_CONFIG) with the local Go toolchain"
-	@echo "  claude                        Interactively select a SiliconFlow model, update Claude Code settings, and print exports"
+	@echo "  claude                        Interactively select a SiliconFlow model, update Claude Code settings, automatically restart ccr, and print exports"
+	@echo "  raw-models                    Fetch SiliconFlow models and save the JSON list to siliconflow.models.json"
 	@echo "  gen-opencode-linux-arm64      Build linux-arm64 binary and generate $(OPENCODE_CONFIG)"
 	@echo "  gen-opencode-linux-amd64      Build linux-amd64 binary and generate $(OPENCODE_CONFIG)"
 	@echo "  gen-opencode-darwin-arm64     Build darwin-arm64 binary and generate $(OPENCODE_CONFIG)"
-	@echo "  raw-models                    Fetch and save the raw SiliconFlow model API response"
 	@echo "  test                          Run Go tests"
 	@echo "  format                        Format Go source"
 	@echo "  clean                         Remove generated binaries and config files"

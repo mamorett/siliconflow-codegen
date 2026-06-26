@@ -2,7 +2,7 @@
 
 `siliconflow-codegen` is a tiny Go command-line tool that talks to the SiliconFlow model API and can generate provider configurations for OpenCode, Crush, or Qwencode.
 
-By default, it prints the raw SiliconFlow model API response. With `--gen-opencode`, `--gen-crush`, or `--gen-qwencode`, it converts the discovered model IDs into a ready-to-use provider config.
+By default (no flags) it prints a usage message. With `--model`, `--gen-opencode`, `--gen-crush`, `--gen-qwencode`, or `--claude`, it converts the discovered model IDs into the requested format.
 
 The generated provider is intentionally SiliconFlow-specific:
 
@@ -65,15 +65,15 @@ The generated Qwencode config will contain:
 
 The tool never writes your real API key into the generated config file.
 
-## Fetch the raw model list
+## Fetch the model list as JSON
 
-Without flags, the program prints the raw SiliconFlow API response:
+The `--model` flag fetches the model list from SiliconFlow and prints it as a sorted JSON array of model IDs:
 
 ```bash
-go run .
+go run . --model
 ```
 
-You can also save the raw response:
+You can also save the response:
 
 ```bash
 make raw-models
@@ -85,7 +85,7 @@ This writes:
 siliconflow.models.json
 ```
 
-The raw endpoint is:
+The model list endpoint is:
 
 ```text
 https://api.siliconflow.com/v1/models
@@ -96,6 +96,14 @@ The request uses:
 ```text
 Accept: application/json
 Authorization: Bearer ${SILICONFLOW_API_KEY}
+```
+
+## Usage
+
+Running without any flags prints a usage message to stdout and exits successfully:
+
+```bash
+go run .
 ```
 
 ## Generate the Qwencode config
@@ -189,14 +197,16 @@ Additionally, it automatically configures `~/.claude-code-router/config.json` by
 * `api_base_url` set to the full chat completions endpoint: `"https://api.siliconflow.com/v1/chat/completions"`
 * `transformer.use` set to `["OpenAI"]` (and dynamically appends `"reasoning"` if a reasoning model like R1 is selected)
 
-> [!IMPORTANT]
-> After updating the configuration, you must restart your Claude Code Router service for the changes to take effect:
+> [!NOTE]
+> The tool automatically runs `ccr restart` after updating the configuration. If that step fails (for example because `ccr` is not installed), you can restart the router manually:
 > ```bash
 > ccr restart
 > ccr code # to start Claude Code with the router
 > ```
 
-Additionally, the tool outputs shell export statements on `stdout` so you can set these variables immediately in your current terminal session using `eval`:
+Additionally, it automatically restarts Claude Code Router via `ccr restart` so the new provider settings take effect immediately. If the restart fails (for example because `ccr` is not installed), a warning is printed and the updated configuration files remain in place; you can then run `ccr restart` manually.
+
+The tool also outputs shell export statements on `stdout` so you can set these variables immediately in your current terminal session using `eval`:
 
 ```bash
 eval $(./dist/siliconflow-codegen --claude)
@@ -229,7 +239,8 @@ ccr --version
 3. It prompts you to enter a number to make a selection.
 4. It updates (or creates) `~/.claude/settings.json` with the environment variables.
 5. It updates (or creates) `~/.claude-code-router/config.json` with SiliconFlow provider settings.
-6. It prints the `export` shell commands to `stdout`, allowing `eval` to update the current shell session.
+6. It runs `ccr restart` so the new provider configuration takes effect immediately.
+7. It prints the `export` shell commands to `stdout`, allowing `eval` to update the current shell session.
 
 ## Generated OpenCode config shape
 
@@ -438,11 +449,11 @@ siliconflow.opencode.json
 | `make gen-opencode` | Generate `siliconflow.opencode.json` using `go run . --gen-opencode`. |
 | `make gen-crush` | Generate `siliconflow.crush.json` using `go run . --gen-crush`. |
 | `make gen-qwencode` | Generate `siliconflow.qwencode.json` using `go run . --gen-qwencode`. |
-| `make claude` | Interactively select a SiliconFlow model, update Claude Code settings, and print exports. |
+| `make claude` | Interactively select a SiliconFlow model, update Claude Code settings, automatically restart ccr, and print exports. |
 | `make gen-opencode-linux-arm64` | Build the Linux ARM64 binary, then generate the OpenCode config. |
 | `make gen-opencode-linux-amd64` | Build the Linux AMD64 binary, then generate the OpenCode config. |
 | `make gen-opencode-darwin-arm64` | Build the macOS ARM64 binary, then generate the OpenCode config. |
-| `make raw-models` | Fetch and save the raw SiliconFlow API response to `siliconflow.models.json`. |
+| `make raw-models` | Fetch the SiliconFlow model list and save it as a JSON array to `siliconflow.models.json`. |
 | `make test` | Run Go tests. |
 | `make format` | Format the Go source with `gofmt`. |
 | `make clean` | Remove generated binaries and generated JSON files. |
@@ -555,7 +566,7 @@ The program will print the API status and response body. Common causes:
 - rate limiting
 - temporary SiliconFlow service issue
 
-Check the raw response:
+Check the model list:
 
 ```bash
 make raw-models

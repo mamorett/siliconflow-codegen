@@ -148,6 +148,62 @@ func TestGenerateQwencodeConfigRejectsEmptyModelList(t *testing.T) {
 	}
 }
 
+func TestGenerateModelListJSON(t *testing.T) {
+	body := []byte(`{"data":[{"id":"b-model"},{"id":"a-model"},{"id":"  "}]}`)
+
+	encoded, err := generateModelListJSON(body)
+	if err != nil {
+		t.Fatalf("generateModelListJSON returned error: %v", err)
+	}
+
+	var ids []string
+	if err := json.Unmarshal(encoded, &ids); err != nil {
+		t.Fatalf("output is not a valid JSON array of strings: %v\nbody: %s", err, string(encoded))
+	}
+
+	want := []string{"a-model", "b-model"}
+	if len(ids) != len(want) {
+		t.Fatalf("ids length = %d, want %d", len(ids), len(want))
+	}
+	for i, id := range want {
+		if ids[i] != id {
+			t.Fatalf("ids[%d] = %q, want %q", i, ids[i], id)
+		}
+	}
+
+	if len(encoded) == 0 || encoded[len(encoded)-1] != '\n' {
+		t.Fatalf("output should end with a trailing newline, got %q", string(encoded))
+	}
+}
+
+func TestGenerateModelListJSONRejectsEmptyModelList(t *testing.T) {
+	if _, err := generateModelListJSON([]byte(`{"data":[]}`)); err == nil {
+		t.Fatal("generateModelListJSON returned nil error for empty model list")
+	}
+}
+
+func TestRestartClaudeCodeRouterReturnsErrorWhenCommandMissing(t *testing.T) {
+	// Isolate PATH to an empty directory so `ccr` is guaranteed not to be
+	// found, regardless of what is installed on the test host.
+	oldPath, hadPath := os.LookupEnv("PATH")
+	defer func() {
+		if hadPath {
+			os.Setenv("PATH", oldPath)
+		} else {
+			os.Unsetenv("PATH")
+		}
+	}()
+
+	emptyDir := t.TempDir()
+	if err := os.Setenv("PATH", emptyDir); err != nil {
+		t.Fatalf("failed to set PATH: %v", err)
+	}
+
+	if err := restartClaudeCodeRouter(); err == nil {
+		t.Fatal("restartClaudeCodeRouter returned nil error when ccr is not in PATH")
+	}
+}
+
 func TestParseModelIDsDeduplicatesAndSorts(t *testing.T) {
 	ids, err := parseModelIDs([]byte(`{"data":[{"id":"b"},{"id":"a"},{"id":"b"},{"id":"  "}]}`))
 	if err != nil {
