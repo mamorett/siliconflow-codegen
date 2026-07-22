@@ -23,7 +23,7 @@ You need:
 - `make`
 - A SiliconFlow API key exposed as `SILICONFLOW_API_KEY`
 - Optional: `jq`, useful for inspecting generated JSON
-- Optional: [claude-code-router](https://github.com/musistudio/claude-code-router), required when using the `--claude` option (see [installation](#installing-claude-code-router))
+- Optional: [claude-code-router](https://github.com/musistudio/claude-code-router) (version 2.0), required when using the `--claude` option (see [installation](#installing-claude-code-router))
 
 Check your Go version:
 
@@ -220,10 +220,10 @@ eval $(make -s claude)
 
 ### Installing claude-code-router
 
-The `--claude` option requires [claude-code-router](https://github.com/musistudio/claude-code-router) to be installed globally:
+The `--claude` option requires [claude-code-router](https://github.com/musistudio/claude-code-router) version 2.0 to be installed globally:
 
 ```bash
-npm install -g @musistudio/claude-code-router
+npm install -g @musistudio/claude-code-router@2.0
 ```
 
 Verify the installation:
